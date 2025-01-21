@@ -1,0 +1,85 @@
+#include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <assert.h>
+#include <semaphore.h>
+
+#define FILOSOFOS 5
+#define ATRASO 5000
+#define COMIDA 50
+
+void *filosofo(void *id);
+void pegar_hashi(int, int, char *);
+void soltar_hashis(int, int);
+int comida_na_mesa();
+
+pthread_t filo[FILOSOFOS];
+sem_t hashi[FILOSOFOS];
+sem_t mutex;
+sem_t limite;
+
+int main() {
+    sem_init(&mutex, 0, 1);
+    sem_init(&limite, 0, FILOSOFOS - 1);
+    for(int i = 0; i < FILOSOFOS; i++)
+        sem_init(&hashi[i], 0, 1);
+    for(int i = 0; i < FILOSOFOS; i++)
+        pthread_create(&filo[i], NULL, filosofo, (void *)i);
+    for(int i = 0; i < FILOSOFOS; i++)
+        pthread_join(filo[i], NULL);
+    sem_destroy(&mutex);
+    sem_destroy(&limite);
+    for(int i = 0; i < FILOSOFOS; i++)
+        sem_destroy(&hashi[i]);
+    return 0;
+}
+
+void *filosofo(void *num) {
+    int id = (int) num;
+    int hashi_esquerdo, hashi_direito, f;
+
+    printf("Filósofo %d terminou de pensar e agora está pronto para comer.\n", id);
+    hashi_direito = id;
+    hashi_esquerdo = id + 1;
+
+    if(hashi_esquerdo == FILOSOFOS)
+        hashi_esquerdo = 0;
+
+    while(f = comida_na_mesa()) {
+        sem_wait(&limite);
+        pegar_hashi(id, hashi_direito, "direito");
+        pegar_hashi(id, hashi_esquerdo, "esquerdo");
+        printf("Filósofo %d: comendo.\n", id);
+        usleep(ATRASO * (COMIDA - f + 1));
+        soltar_hashis(hashi_esquerdo, hashi_direito);
+        sem_post(&limite);
+    }
+
+    printf("Filósofo %d terminou de comer.\n", id);
+    return (NULL);
+}
+
+int comida_na_mesa() {
+    static int comida = COMIDA;
+    int minha_comida;
+
+    sem_wait(&mutex);
+    if(comida > 0) {
+        comida--;
+    }
+    minha_comida = comida;
+    sem_post(&mutex);
+    return minha_comida;
+}
+
+void pegar_hashi(int fil, int c, char *mao) {
+    sem_wait(&hashi[c]);
+    printf("Filósofo %d: pegou o hashi %s %d\n", fil, mao, c);
+}
+
+void soltar_hashis(int c1, int c2) {
+    sem_post(&hashi[c1]);
+    sem_post(&hashi[c2]);
+}
