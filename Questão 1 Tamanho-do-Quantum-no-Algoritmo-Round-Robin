@@ -1,0 +1,88 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+#define MAX_PROCESSOS 100
+
+void round_robin(int processos[], int burst_times[], int n, int quantum, double *tempo_medio_espera, double *tempo_medio_retorno, double *vazao) {
+    int tempo_espera[MAX_PROCESSOS] = {0};
+    int tempo_retorno[MAX_PROCESSOS] = {0};
+    int burst_restante[MAX_PROCESSOS];
+    int troca_contexto = 1;
+
+    for (int i = 0; i < n; i++) {
+        burst_restante[i] = burst_times[i];
+    }
+
+    int tempo = 0;
+    int sequencia_execucao[MAX_PROCESSOS * 100];
+    int index_sequencia = 0;
+
+    while (1) {
+        int concluido = 1;
+        for (int i = 0; i < n; i++) {
+            if (burst_restante[i] > 0) {
+                concluido = 0;
+                sequencia_execucao[index_sequencia++] = processos[i];
+
+                if (burst_restante[i] > quantum) {
+                    tempo += quantum + troca_contexto;
+                    burst_restante[i] -= quantum;
+                } else {
+                    tempo += burst_restante[i] + troca_contexto;
+                    tempo_espera[i] = tempo - burst_times[i] - troca_contexto;
+                    burst_restante[i] = 0;
+                }
+            }
+        }
+
+        if (concluido)
+            break;
+    }
+
+    for (int i = 0; i < n; i++) {
+        tempo_retorno[i] = burst_times[i] + tempo_espera[i];
+    }
+
+    double soma_espera = 0, soma_retorno = 0;
+    for (int i = 0; i < n; i++) {
+        soma_espera += tempo_espera[i];
+        soma_retorno += tempo_retorno[i];
+    }
+
+    *tempo_medio_espera = soma_espera / n;
+    *tempo_medio_retorno = soma_retorno / n;
+    *vazao = (double)n / tempo;
+
+    // Exibir a sequência de execução
+    printf("Sequência de Execução: ");
+    for (int i = 0; i < index_sequencia; i++) {
+        printf("P%d ", sequencia_execucao[i]);
+    }
+    printf("\n");
+}
+
+// Função principal
+int main() {
+    int processos[] = {1, 2, 3, 4, 5}; // Exemplo com 5 processos
+    int burst_times[] = {10, 5, 8, 6, 7}; // Burst times de cada processo
+    int n = sizeof(processos) / sizeof(processos[0]);
+
+    int quantum_values[] = {2, 4, 6};
+    int num_quantum = sizeof(quantum_values) / sizeof(quantum_values[0]);
+
+    for (int q = 0; q < num_quantum; q++) {
+        int quantum = quantum_values[q];
+        printf("\nSimulação para Quantum = %d\n", quantum);
+
+        double tempo_medio_espera, tempo_medio_retorno, vazao;
+        round_robin(processos, burst_times, n, quantum, &tempo_medio_espera, &tempo_medio_retorno, &vazao);
+
+        printf("Tempo Médio de Espera: %.2f\n", tempo_medio_espera);
+        printf("Tempo Médio de Retorno: %.2f\n", tempo_medio_retorno);
+        printf("Vazão: %.2f processos/unidade de tempo\n", vazao);
+    }
+
+    return 0;
+}
